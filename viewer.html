@@ -108,14 +108,27 @@ fileInput.addEventListener('change', (event) => {
     const exporter = new GLTFExporter();
 
     exporter.parse(
-      scene,
-      (result) => {
-        const blob = new Blob([result], { type: 'model/gltf-binary' });
-        viewer.src = URL.createObjectURL(blob);
-      },
-      { binary: true }
-    );
-  };
+  scene,
+  (result) => {
+
+    let blob;
+
+    // ✅ Case 1: GLB (ArrayBuffer)
+    if (result instanceof ArrayBuffer) {
+      blob = new Blob([result], { type: 'model/gltf-binary' });
+    }
+    // ✅ Case 2: GLTF JSON (object)
+    else {
+      const json = JSON.stringify(result);
+      blob = new Blob([json], { type: 'application/json' });
+    }
+
+    const url = URL.createObjectURL(blob);
+    viewer.src = url;
+  },
+  { binary: true }
+);
+
 
   if (ext === "stl") {
     reader.readAsArrayBuffer(file);
