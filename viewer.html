@@ -116,3 +116,29 @@ fileInput.addEventListener('change', (event) => {
           blob = new Blob([result], { type: 'model/gltf-binary' });
           debug.innerHTML += "<br>✅ Exported as GLB";
         } else {
+          blob = new Blob(
+            [JSON.stringify(result)],
+            { type: 'application/json' }
+          );
+          debug.innerHTML += "<br>⚠️ Exported as GLTF JSON";
+        }
+
+        viewer.src = URL.createObjectURL(blob);
+      },
+      { binary: true }
+    );
+  };
+
+  // ✅ THIS MUST BE OUTSIDE onload
+  if (ext === "stl") {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
+
+});
+
+</script>
+
+</body>
+</html>
