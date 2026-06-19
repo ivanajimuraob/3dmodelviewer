@@ -1,11 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>3D Viewer</title>
 
-  <!-- ✅ CORRECT script tag -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.jsdy {
+  <!-- ✅ Fix module resolution -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <!-- ✅ model-viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    body {
       font-family: Arial;
       margin: 20px;
       text-align: center;
@@ -42,17 +54,15 @@
 
 <script type="module">
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';  // ✅ now works!
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/OBJLoader.js';
 import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js';
 
 const debug = document.getElementById('debug');
 
-/* ✅ If you see this, your script is running */
-debug.innerHTML = "✅ Module script started<br>";
-
-debug.innerHTML += `
+debug.innerHTML = `
+✅ Module loaded<br>
 Three.js REVISION: ${THREE.REVISION}<br>
 STLLoader loaded: ${typeof STLLoader !== 'undefined'}<br>
 `;
@@ -75,6 +85,7 @@ fileInput.addEventListener('change', (event) => {
 
   reader.onload = (e) => {
     const scene = new THREE.Scene();
+
     const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
     scene.add(light);
 
@@ -86,6 +97,12 @@ fileInput.addEventListener('change', (event) => {
       const mesh = new THREE.Mesh(geometry, material);
 
       scene.add(mesh);
+    }
+
+    if (ext === "obj") {
+      const loader = new OBJLoader();
+      const obj = loader.parse(e.target.result);
+      scene.add(obj);
     }
 
     const exporter = new GLTFExporter();
@@ -100,10 +117,15 @@ fileInput.addEventListener('change', (event) => {
     );
   };
 
-  reader.readAsArrayBuffer(file);
+  if (ext === "stl") {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
 });
 
 </script>
 
 </body>
 </html>
+``
