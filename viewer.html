@@ -31,60 +31,73 @@
 const fileInput = document.getElementById('fileInput');
 const viewer = document.getElementById('viewer');
 
-fileInput.addEventListener('change', async (event) => {
+fileInput.addEventListener('change', (event) => {
   const file = event.target.files[0];
   if (!file) return;
 
-  const extension = file.name.split('.').pop().toLowerCase();
+  const ext = file.name.split('.').pop().toLowerCase();
 
-  // ✅ If already GLB → load directly
-  if (extension === 'glb') {
+  if (ext === "glb") {
     viewer.src = URL.createObjectURL(file);
     return;
   }
 
   const reader = new FileReader();
 
-  reader.onload = function(e) {
+  reader.onload = (e) => {
     const scene = new THREE.Scene();
 
-    // Basic lighting
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+    // lighting
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
     scene.add(light);
 
-    let loader;
-
-    if (extension === 'stl') {
-      loader = new THREE.STLLoader();
+    if (ext === "stl") {
+      const loader = new THREE.STLLoader();
       const geometry = loader.parse(e.target.result);
-      const material = new THREE.MeshStandardMaterial({ color: 0x999999 });
+
+      geometry.computeVertexNormals();
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x888888,
+      });
+
       const mesh = new THREE.Mesh(geometry, material);
+
+      // ✅ CENTER + SCALE (important for visibility!)
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      mesh.position.sub(center);
+
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 2 / maxDim;
+      mesh.scale.set(scale, scale, scale);
+
       scene.add(mesh);
 
-    } else if (extension === 'obj') {
-      loader = new THREE.OBJLoader();
+    } else if (ext === "obj") {
+      const loader = new THREE.OBJLoader();
       const obj = loader.parse(e.target.result);
       scene.add(obj);
     }
 
-    // ✅ Convert to GLB
     const exporter = new THREE.GLTFExporter();
 
     exporter.parse(
       scene,
-      function (result) {
+      (result) => {
         const blob = new Blob([result], { type: 'model/gltf-binary' });
-        const url = URL.createObjectURL(blob);
-
-        // Load in model-viewer
-        viewer.src = url;
+        viewer.src = URL.createObjectURL(blob);
       },
       { binary: true }
     );
   };
 
-  if (extension === 'stl') {
-    reader.readAsArrayBuffer(file);
+  if (ext === "stl") {
+    reader.readAsArrayBuffer(file); // ✅ critical
   } else {
     reader.readAsText(file);
   }
