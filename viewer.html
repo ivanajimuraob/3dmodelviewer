@@ -1,135 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>3D Viewer</title>
+<meta charset="UTF-8" />
+<title>3D Viewer</title>
 
-  <!-- Import map -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-    }
+<!-- Import map -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
   }
-  </script>
+}
+</script>
 
-  <!-- model-viewer -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<!-- model-viewer -->
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
-  <style>
-    body {
-      font-family: Arial;
-      margin: 20px;
-      text-align: center;
-    }
+<style>
+  body {
+    font-family: Arial;
+    margin: 0;
+    text-align: center;
+    overflow: hidden;
+  }
 
-    #debug {
-      background: #222;
-      color: #0f0;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-family: monospace;
-      text-align: left;
-    }
+  h2 {
+    margin: 10px 0;
+  }
 
-    model-viewer {
-      width: 100%;
-      height: 400px;
-      background: #eee;
-    }
-  </style>
+  #viewer3D {
+    width: 100%;
+    height: 400px;
+    display: none;
+  }
+
+  model-viewer {
+    width: 100%;
+    height: 400px;
+    background: #eee;
+  }
+
+  canvas {
+    width: 100% !important;
+    height: 400px !important;
+  }
+</style>
 </head>
 
 <body>
 
 <h2>Upload 3D Model (.stl, .obj, .glb)</h2>
 
-<div id="debug">Loading debug info...</div>
-
 <input type="file" id="fileInput" accept=".stl,.obj,.glb">
 
 <br><br>
 
-<model-viewer id="viewer" camera-controls auto-rotate></model-viewer>
+<!-- GLB viewer -->
+<model-viewer id="mv" camera-controls auto-rotate></model-viewer>
+
+<!-- Three.js viewer -->
+<div id="viewer3D"></div>
 
 <script type="module">
-
 import * as THREE from 'three';
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/OBJLoader.js';
-import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js';
 
-const debug = document.getElementById('debug');
-const fileInput = document.getElementById('fileInput');
-const viewer = document.getElementById('viewer');
+const input = document.getElementById('fileInput');
+const mv = document.getElementById('mv');
+const container = document.getElementById('viewer3D');
 
-debug.innerHTML = `
-✅ Module loaded<br>
-Three.js REVISION: ${THREE.REVISION}<br>
-`;
+let renderer, scene, camera;
 
-fileInput.addEventListener('change', (event) => {
-  const file = event.target.files[0];
+/* ✅ Setup Three.js */
+function setupThree() {
+  container.innerHTML = "";
+
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(
+    45,
+    container.clientWidth / 400,
+    0.1,
+    1000
+  );
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(container.clientWidth, 400);
+  container.appendChild(renderer.domElement);
+
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+  scene.add(light);
+
+  camera.position.set(0, 0, 5);
+
+  animate();
+}
+
+/* ✅ Render loop */
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+/* ✅ Load file */
+input.addEventListener('change', (e) => {
+  const file = e.target.files[0];
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
 
-  // ✅ GLB direct
+  // ✅ GLB → model-viewer
   if (ext === "glb") {
-    viewer.src = URL.createObjectURL(file);
+    container.style.display = "none";
+    mv.style.display = "block";
+
+    mv.src = URL.createObjectURL(file);
     return;
   }
 
+  // ✅ STL / OBJ → Three.js
+  mv.style.display = "none";
+  container.style.display = "block";
+
+  setupThree();
+
   const reader = new FileReader();
 
-  reader.onload = (e) => {
-
-    const scene = new THREE.Scene();
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
-    scene.add(light);
+  reader.onload = (event) => {
 
     if (ext === "stl") {
       const loader = new STLLoader();
-      const geometry = loader.parse(e.target.result);
+      const geometry = loader.parse(event.target.result);
 
-      const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x888888
+      });
+
       const mesh = new THREE.Mesh(geometry, material);
 
+      normalize(mesh, geometry);
       scene.add(mesh);
     }
 
     if (ext === "obj") {
       const loader = new OBJLoader();
-      const obj = loader.parse(e.target.result);
+      const obj = loader.parse(event.target.result);
+
       scene.add(obj);
     }
-
-    const exporter = new GLTFExporter();
-
-    exporter.parse(
-      scene,
-      (result) => {
-
-        let blob;
-
-        if (result instanceof ArrayBuffer) {
-          blob = new Blob([result], { type: 'model/gltf-binary' });
-          debug.innerHTML += "<br>✅ Exported as GLB";
-        } else {
-          blob = new Blob(
-            [JSON.stringify(result)],
-            { type: 'application/json' }
-          );
-          debug.innerHTML += "<br>⚠️ Exported as GLTF JSON";
-        }
-
-        viewer.src = URL.createObjectURL(blob);
-      },
-      { binary: true }
-    );
   };
 
-  // ✅ THIS MUST BE OUTSIDE onload
   if (ext === "stl") {
     reader.readAsArrayBuffer(file);
   } else {
@@ -137,6 +158,26 @@ fileInput.addEventListener('change', (event) => {
   }
 
 });
+
+/* ✅ Center + scale model */
+function normalize(mesh, geometry) {
+  geometry.computeBoundingBox();
+
+  const box = geometry.boundingBox;
+
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+
+  mesh.position.sub(center);
+
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 2 / maxDim;
+
+  mesh.scale.set(scale, scale, scale);
+}
 
 </script>
 
