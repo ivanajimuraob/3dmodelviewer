@@ -20,19 +20,33 @@
 
 <input type="file" id="fileInput" accept=".stl,.obj,.glb" />
 
+
+<div id="debug" style="padding:10px; background:#222; color:#0f0; font-family:monospace;">
+  Loading debug info...
+</div>
+
+  
 <model-viewer
   id="viewer"
   style="width:100%; height:400px; background:#eee;"
   camera-controls
   auto-rotate>
 </model-viewer>
-
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-
 import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/OBJLoader.js';
 import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js';
+
+const debug = document.getElementById('debug');
+
+// ✅ Show version + loader status
+debug.innerHTML = `
+Three.js REVISION: ${THREE.REVISION}<br>
+STLLoader loaded: ${typeof STLLoader !== 'undefined'}<br>
+OBJLoader loaded: ${typeof OBJLoader !== 'undefined'}<br>
+GLTFExporter loaded: ${typeof GLTFExporter !== 'undefined'}<br>
+`;
 
 const fileInput = document.getElementById('fileInput');
 const viewer = document.getElementById('viewer');
@@ -56,46 +70,37 @@ fileInput.addEventListener('change', (event) => {
     const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
     scene.add(light);
 
-    if (ext === "stl") {
-      const loader = new STLLoader();
-      const geometry = loader.parse(e.target.result);
+    try {
+      if (ext === "stl") {
+        const loader = new STLLoader(); // ✅ now module-based
+        const geometry = loader.parse(e.target.result);
 
-      geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const mesh = new THREE.Mesh(geometry, material);
 
-      const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
-      const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
 
-      // ✅ Center + scale
-      geometry.computeBoundingBox();
-      const box = geometry.boundingBox;
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      mesh.position.sub(center);
+      } else if (ext === "obj") {
+        const loader = new OBJLoader();
+        const obj = loader.parse(e.target.result);
+        scene.add(obj);
+      }
 
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 2 / maxDim;
-      mesh.scale.set(scale, scale, scale);
+      const exporter = new GLTFExporter();
 
-      scene.add(mesh);
+      exporter.parse(
+        scene,
+        (result) => {
+          const blob = new Blob([result], { type: 'model/gltf-binary' });
+          viewer.src = URL.createObjectURL(blob);
+        },
+        { binary: true }
+      );
 
-    } else if (ext === "obj") {
-      const loader = new OBJLoader();
-      const obj = loader.parse(e.target.result);
-      scene.add(obj);
+    } catch (err) {
+      debug.innerHTML += `<br><span style="color:red;">ERROR: ${err.message}</span>`;
+      console.error(err);
     }
-
-    const exporter = new GLTFExporter();
-
-    exporter.parse(
-      scene,
-      (result) => {
-        const blob = new Blob([result], { type: 'model/gltf-binary' });
-        viewer.src = URL.createObjectURL(blob);
-      },
-      { binary: true }
-    );
   };
 
   if (ext === "stl") {
@@ -105,6 +110,7 @@ fileInput.addEventListener('change', (event) => {
   }
 });
 </script>
+
 
 </body>
 </html>
